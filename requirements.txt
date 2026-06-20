@@ -1,0 +1,9 @@
+# Web chat UI
+fastapi
+uvicorn[standard]
+
+# Promptetheus SDK — lives in the backend repo (the published PyPI `promptetheus`
+# is a name-reservation stub). Optional for the local UI demo: if it's not
+# installed, the agent falls back to a local in-memory recorder (see
+# promptetheus_compat.py). Install it to post real traces over HTTP for the demo:
+#   pip install "git+https://github.com/obro79/promptetheus-hackathon.git@main#subdirectory=packages/promptetheus"

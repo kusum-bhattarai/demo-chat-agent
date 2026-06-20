@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Support Chat — Promptetheus demo</title>
+<style>
+  :root {
+    --bg: #0e1117;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --line: #2a3340;
+    --text: #e6edf3;
+    --muted: #8b97a7;
+    --agent: #1f6feb;
+    --user: #2d333b;
+    --tool: #131a24;
+    --danger: #f85149;
+    --danger-bg: #2d1417;
+    --ok: #3fb950;
+    --accent: #d29922;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex; min-height: 100vh; align-items: center; justify-content: center; padding: 24px;
+  }
+  .app { width: 100%; max-width: 560px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+    background: var(--panel-2); border-bottom: 1px solid var(--line);
+  }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%; flex: none;
+    background: linear-gradient(135deg, #1f6feb, #388bfd);
+    display: grid; place-items: center; font-size: 18px;
+  }
+  header h1 { font-size: 15px; margin: 0; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  header .badge {
+    margin-left: auto; font-size: 11px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; white-space: nowrap;
+  }
+  .badge .dot { color: var(--ok); }
+
+  #log {
+    height: 440px; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .row { display: flex; }
+  .row.user { justify-content: flex-end; }
+  .bubble {
+    max-width: 80%; padding: 10px 14px; border-radius: 16px; white-space: pre-wrap; word-wrap: break-word;
+    animation: pop .18s ease-out;
+  }
+  .row.agent .bubble { background: var(--agent); border-bottom-left-radius: 4px; }
+  .row.user .bubble  { background: var(--user); border-bottom-right-radius: 4px; }
+  .row.tool {
+    justify-content: center;
+  }
+  .row.tool .bubble {
+    background: var(--tool); border: 1px dashed var(--line); color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; max-width: 92%;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .typing .bubble { color: var(--muted); }
+  .typing .bubble span { display: inline-block; animation: blink 1.2s infinite; }
+  .typing .bubble span:nth-child(2) { animation-delay: .2s; }
+  .typing .bubble span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
+
+  footer { padding: 14px 18px; border-top: 1px solid var(--line); background: var(--panel-2); }
+  button {
+    width: 100%; padding: 12px 16px; border: 0; border-radius: 10px; cursor: pointer;
+    background: var(--agent); color: #fff; font-size: 14px; font-weight: 600;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+
+  .incident {
+    margin-top: 14px; border: 1px solid var(--danger); background: var(--danger-bg);
+    border-radius: 12px; padding: 14px 16px; display: none;
+  }
+  .incident.show { display: block; animation: pop .25s ease-out; }
+  .incident h3 { margin: 0 0 6px; font-size: 13px; color: var(--danger); letter-spacing: .3px; }
+  .incident p { margin: 0 0 10px; font-size: 13px; color: var(--text); }
+  .meta { font-size: 11.5px; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+    border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; color: var(--muted);
+  }
+  .chip.fail { border-color: var(--danger); color: var(--danger); }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="card">
+      <header>
+        <div class="avatar">🩺</div>
+        <div>
+          <h1>HealthPlan Support</h1>
+          <div class="sub">Billing &amp; refunds assistant</div>
+        </div>
+        <div class="badge"><span class="dot">●</span> instrumented by Promptetheus</div>
+      </header>
+
+      <div id="log"></div>
+
+      <footer>
+        <button id="run">Start refund chat</button>
+        <div class="incident" id="incident">
+          <h3>⚠ SILENT FAILURE DETECTED</h3>
+          <p id="incidentText"></p>
+          <div class="meta" id="incidentMeta"></div>
+          <div class="chips" id="chips"></div>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+<script>
+const log = document.getElementById("log");
+const btn = document.getElementById("run");
+const incident = document.getElementById("incident");
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function addBubble(role, text) {
+  const row = document.createElement("div");
+  row.className = "row " + role;
+  const b = document.createElement("div");
+  b.className = "bubble";
+  b.textContent = text;
+  row.appendChild(b);
+  log.appendChild(row);
+  log.scrollTop = log.scrollHeight;
+}
+
+function typing(role) {
+  const row = document.createElement("div");
+  row.className = "row " + role + " typing";
+  row.innerHTML = '<div class="bubble"><span>●</span><span>●</span><span>●</span></div>';
+  log.appendChild(row);
+  log.scrollTop = log.scrollHeight;
+  return row;
+}
+
+async function run() {
+  btn.disabled = true;
+  log.innerHTML = "";
+  incident.classList.remove("show");
+
+  const res = await fetch("/api/run", { method: "POST" });
+  const data = await res.json();
+
+  for (const msg of data.transcript) {
+    if (msg.role === "tool") {
+      await sleep(450);
+      addBubble("tool", msg.text);
+    } else {
+      const t = typing(msg.role === "user" ? "user" : "agent");
+      await sleep(msg.role === "user" ? 350 : 800);
+      t.remove();
+      addBubble(msg.role, msg.text);
+    }
+    await sleep(300);
+  }
+
+  await sleep(500);
+  document.getElementById("incidentText").textContent =
+    "The agent retrieved the correct order ($20, refundable $20) but issued a $200 refund — " +
+    "a 10× overpayment — and ended the chat as if it helped. goal_check FAILED.";
+  document.getElementById("incidentMeta").textContent =
+    `session ${data.session_id} · ${data.events_emitted} events → ${data.target} · ` +
+    `SDK: ${data.using_real_sdk ? "real" : "local fallback"}`;
+  const chips = document.getElementById("chips");
+  chips.innerHTML = "";
+  for (const t of data.event_types) {
+    const c = document.createElement("span");
+    c.className = "chip" + (t === "goal_check" ? " fail" : "");
+    c.textContent = t;
+    chips.appendChild(c);
+  }
+  incident.classList.add("show");
+  btn.disabled = false;
+  btn.textContent = "Replay refund chat";
+}
+
+btn.addEventListener("click", run);
+</script>
+</body>
+</html>
