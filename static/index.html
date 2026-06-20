@@ -6,19 +6,9 @@
 <title>Support Chat — Promptetheus demo</title>
 <style>
   :root {
-    --bg: #0e1117;
-    --panel: #161b22;
-    --panel-2: #1c2330;
-    --line: #2a3340;
-    --text: #e6edf3;
-    --muted: #8b97a7;
-    --agent: #1f6feb;
-    --user: #2d333b;
-    --tool: #131a24;
-    --danger: #f85149;
-    --danger-bg: #2d1417;
-    --ok: #3fb950;
-    --accent: #d29922;
+    --bg: #0e1117; --panel: #161b22; --panel-2: #1c2330; --line: #2a3340;
+    --text: #e6edf3; --muted: #8b97a7; --agent: #1f6feb; --user: #2d333b;
+    --tool: #131a24; --danger: #f85149; --danger-bg: #2d1417; --ok: #3fb950;
   }
   * { box-sizing: border-box; }
   body {
@@ -37,8 +27,7 @@
   }
   .avatar {
     width: 38px; height: 38px; border-radius: 50%; flex: none;
-    background: linear-gradient(135deg, #1f6feb, #388bfd);
-    display: grid; place-items: center; font-size: 18px;
+    background: linear-gradient(135deg, #1f6feb, #388bfd); display: grid; place-items: center; font-size: 18px;
   }
   header h1 { font-size: 15px; margin: 0; }
   header .sub { color: var(--muted); font-size: 12px; }
@@ -46,11 +35,9 @@
     margin-left: auto; font-size: 11px; color: var(--muted);
     border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; white-space: nowrap;
   }
-  .badge .dot { color: var(--ok); }
+  header .badge .dot { color: var(--ok); }
 
-  #log {
-    height: 440px; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px;
-  }
+  #log { height: 420px; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
   .row { display: flex; }
   .row.user { justify-content: flex-end; }
   .bubble {
@@ -59,42 +46,50 @@
   }
   .row.agent .bubble { background: var(--agent); border-bottom-left-radius: 4px; }
   .row.user .bubble  { background: var(--user); border-bottom-right-radius: 4px; }
-  .row.tool {
-    justify-content: center;
-  }
+  .row.tool { justify-content: center; }
   .row.tool .bubble {
     background: var(--tool); border: 1px dashed var(--line); color: var(--muted);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; max-width: 92%;
   }
   @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-
-  .typing .bubble { color: var(--muted); }
+  .typing .bubble { color: #cdd6e0; }
   .typing .bubble span { display: inline-block; animation: blink 1.2s infinite; }
   .typing .bubble span:nth-child(2) { animation-delay: .2s; }
   .typing .bubble span:nth-child(3) { animation-delay: .4s; }
   @keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
 
-  footer { padding: 14px 18px; border-top: 1px solid var(--line); background: var(--panel-2); }
-  button {
-    width: 100%; padding: 12px 16px; border: 0; border-radius: 10px; cursor: pointer;
-    background: var(--agent); color: #fff; font-size: 14px; font-weight: 600;
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 18px 12px; }
+  .chip-btn {
+    background: transparent; color: #cfe2ff; border: 1px solid var(--agent); border-radius: 999px;
+    padding: 8px 14px; font-size: 13px; cursor: pointer; transition: background .12s;
   }
-  button:disabled { opacity: .5; cursor: default; }
+  .chip-btn:hover { background: rgba(31,111,235,.15); }
+
+  form {
+    display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); background: var(--panel-2);
+  }
+  input[type=text] {
+    flex: 1; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    color: var(--text); padding: 10px 12px; font-size: 14px; outline: none;
+  }
+  input[type=text]:focus { border-color: var(--agent); }
+  .send { background: var(--agent); border: 0; color: #fff; border-radius: 10px; padding: 0 16px; cursor: pointer; font-size: 14px; }
+  .send:disabled { opacity: .5; cursor: default; }
 
   .incident {
-    margin-top: 14px; border: 1px solid var(--danger); background: var(--danger-bg);
+    margin: 0 14px 14px; border: 1px solid var(--danger); background: var(--danger-bg);
     border-radius: 12px; padding: 14px 16px; display: none;
   }
   .incident.show { display: block; animation: pop .25s ease-out; }
   .incident h3 { margin: 0 0 6px; font-size: 13px; color: var(--danger); letter-spacing: .3px; }
-  .incident p { margin: 0 0 10px; font-size: 13px; color: var(--text); }
+  .incident p { margin: 0 0 10px; font-size: 13px; }
   .meta { font-size: 11.5px; color: var(--muted); }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .chip {
+  .ev-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .ev-chip {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
     border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; color: var(--muted);
   }
-  .chip.fail { border-color: var(--danger); color: var(--danger); }
+  .ev-chip.fail { border-color: var(--danger); color: var(--danger); }
 </style>
 </head>
 <body>
@@ -104,29 +99,37 @@
         <div class="avatar">🩺</div>
         <div>
           <h1>HealthPlan Support</h1>
-          <div class="sub">Billing &amp; refunds assistant</div>
+          <div class="sub">Billing &amp; refunds · Robin</div>
         </div>
         <div class="badge"><span class="dot">●</span> instrumented by Promptetheus</div>
       </header>
 
       <div id="log"></div>
+      <div class="chips" id="chips"></div>
+      <div class="incident" id="incident">
+        <h3>⚠ SILENT FAILURE DETECTED</h3>
+        <p id="incidentText"></p>
+        <div class="meta" id="incidentMeta"></div>
+        <div class="ev-chips" id="evChips"></div>
+      </div>
 
-      <footer>
-        <button id="run">Start refund chat</button>
-        <div class="incident" id="incident">
-          <h3>⚠ SILENT FAILURE DETECTED</h3>
-          <p id="incidentText"></p>
-          <div class="meta" id="incidentMeta"></div>
-          <div class="chips" id="chips"></div>
-        </div>
-      </footer>
+      <form id="form">
+        <input type="text" id="text" placeholder="Type a message…" autocomplete="off" />
+        <button class="send" id="send" type="submit">Send</button>
+      </form>
     </div>
   </div>
 
 <script>
 const log = document.getElementById("log");
-const btn = document.getElementById("run");
+const chips = document.getElementById("chips");
 const incident = document.getElementById("incident");
+const form = document.getElementById("form");
+const textInput = document.getElementById("text");
+const sendBtn = document.getElementById("send");
+
+let conversationId = null;
+let busy = false;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -141,57 +144,92 @@ function addBubble(role, text) {
   log.scrollTop = log.scrollHeight;
 }
 
-function typing(role) {
+function typing() {
   const row = document.createElement("div");
-  row.className = "row " + role + " typing";
+  row.className = "row agent typing";
   row.innerHTML = '<div class="bubble"><span>●</span><span>●</span><span>●</span></div>';
   log.appendChild(row);
   log.scrollTop = log.scrollHeight;
   return row;
 }
 
-async function run() {
-  btn.disabled = true;
-  log.innerHTML = "";
-  incident.classList.remove("show");
+function renderChips(options) {
+  chips.innerHTML = "";
+  for (const o of options) {
+    const btn = document.createElement("button");
+    btn.className = "chip-btn";
+    btn.textContent = o.label;
+    btn.onclick = () => send({ choice_id: o.id, echo: o.label });
+    chips.appendChild(btn);
+  }
+}
 
-  const res = await fetch("/api/run", { method: "POST" });
+function showIncident(inc) {
+  document.getElementById("incidentText").textContent =
+    "The agent retrieved the correct order ($20, refundable $20) but issued a $200 refund — " +
+    "a 10× overpayment — and carried on as if it helped. goal_check FAILED.";
+  document.getElementById("incidentMeta").textContent =
+    `session ${inc.session_id} · ${inc.events_emitted} events → ${inc.target} · ` +
+    `SDK: ${inc.using_real_sdk ? "real" : "local fallback"}`;
+  const ev = document.getElementById("evChips");
+  ev.innerHTML = "";
+  for (const t of inc.event_types) {
+    const c = document.createElement("span");
+    c.className = "ev-chip" + (t === "goal_check" ? " fail" : "");
+    c.textContent = t;
+    ev.appendChild(c);
+  }
+  incident.classList.add("show");
+}
+
+async function send({ choice_id = null, text = null, echo = null } = {}) {
+  if (busy) return;
+  busy = true;
+  sendBtn.disabled = true;
+  chips.innerHTML = "";
+  if (echo) addBubble("user", echo);
+
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversation_id: conversationId, choice_id, text }),
+  });
   const data = await res.json();
+  conversationId = data.conversation_id;
 
-  for (const msg of data.transcript) {
+  for (const msg of data.messages) {
     if (msg.role === "tool") {
       await sleep(450);
       addBubble("tool", msg.text);
     } else {
-      const t = typing(msg.role === "user" ? "user" : "agent");
-      await sleep(msg.role === "user" ? 350 : 800);
+      const t = typing();
+      await sleep(750);
       t.remove();
-      addBubble(msg.role, msg.text);
+      addBubble("agent", msg.text);
     }
-    await sleep(300);
+    await sleep(280);
   }
 
-  await sleep(500);
-  document.getElementById("incidentText").textContent =
-    "The agent retrieved the correct order ($20, refundable $20) but issued a $200 refund — " +
-    "a 10× overpayment — and ended the chat as if it helped. goal_check FAILED.";
-  document.getElementById("incidentMeta").textContent =
-    `session ${data.session_id} · ${data.events_emitted} events → ${data.target} · ` +
-    `SDK: ${data.using_real_sdk ? "real" : "local fallback"}`;
-  const chips = document.getElementById("chips");
-  chips.innerHTML = "";
-  for (const t of data.event_types) {
-    const c = document.createElement("span");
-    c.className = "chip" + (t === "goal_check" ? " fail" : "");
-    c.textContent = t;
-    chips.appendChild(c);
+  if (data.incident) {
+    await sleep(450);
+    showIncident(data.incident);
   }
-  incident.classList.add("show");
-  btn.disabled = false;
-  btn.textContent = "Replay refund chat";
+  renderChips(data.options);
+  busy = false;
+  sendBtn.disabled = false;
+  textInput.focus();
 }
 
-btn.addEventListener("click", run);
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const v = textInput.value.trim();
+  if (!v) return;
+  textInput.value = "";
+  send({ text: v, echo: v });
+});
+
+// Kick off the conversation (greeting).
+send();
 </script>
 </body>
 </html>

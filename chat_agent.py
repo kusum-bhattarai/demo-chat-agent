@@ -149,6 +149,59 @@ def run_demo(
     }
 
 
+def emit_ops(
+    ops: list[dict[str, Any]],
+    *,
+    transport: Any | None = None,
+    endpoint: str | None = None,
+    api_key: str | None = None,
+    session_id: str = DEFAULT_SESSION_ID,
+) -> dict[str, Any]:
+    """Replay a list of trace ops (built by the interactive dialogue) into one
+    SDK session. Each op is a dict like ``{"op": "user_message", "content": ...}``.
+    Lets the live, branching conversation produce a single coherent trace.
+    """
+    if transport is None:
+        transport = "http" if endpoint else InMemoryTransport()
+
+    with trace.start(
+        agent="support-chat-agent",
+        user_goal=DEFAULT_GOAL,
+        session_id=session_id,
+        transport=transport,
+        endpoint=endpoint,
+        api_key=api_key,
+        environment="demo",
+        metadata={"surface": "chat", "demo": "refund_overpayment"},
+        tags=["demo", "chat-agent", "refund-overpayment"],
+    ) as session:
+        for op in ops:
+            kind = op["op"]
+            if kind == "user_message":
+                session.user_message(op["content"])
+            elif kind == "agent_message":
+                session.agent_message(op["content"])
+            elif kind == "retrieval":
+                session.retrieval(op["query"], documents=op["documents"])
+            elif kind == "tool_call":
+                session.tool_call(op["tool_name"], op["arguments"], call_id=op["call_id"])
+            elif kind == "tool_result":
+                session.tool_result(op["call_id"], result=op.get("result"))
+            elif kind == "goal_check":
+                session.goal_check(op["passed"], op.get("mismatches"))
+            elif kind == "end":
+                session.end(op.get("status", "completed"))
+
+    events = list(getattr(transport, "events", []) or [])
+    return {
+        "session_id": session_id,
+        "using_real_sdk": USING_REAL_SDK,
+        "events_emitted": len(events),
+        "event_types": [str(event.get("type")) for event in events],
+        "goal_failed": any(o["op"] == "goal_check" and not o["passed"] for o in ops),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--endpoint", help="Promptetheus API URL (needs the real SDK)")

@@ -1,40 +1,44 @@
-# Chat agent — Promptetheus demo (refund overpayment)
+# HealthPlan Support — billing & refunds chat agent
 
-A support-chat agent that **fails silently** for the Promptetheus hackathon demo
-(one of three failing agents: chat, voice, browser). It comes with a small **web
-chat UI** so the failure is visible on a projector.
+**Robin** is a conversational support agent for HealthPlan members. It handles
+billing and refund requests through a guided chat — quick-reply chips plus a free
+text box — and is instrumented end to end with **Promptetheus** for runtime
+observability, so every session is captured as a trace and goal violations are
+caught automatically.
 
-**Scenario:** a customer asks for a refund on order #4471. The agent retrieves
-the correct order (**$20**, refundable $20), then issues a **$200** refund — a
-10× overpayment — and confirms as if it helped. The trace ends in a failed
-`goal_check`, which the Promptetheus engine detects as an incident.
+## What it does
 
-The conversation is **scripted** (deterministic) so it can't flake on stage, but
-the events it emits are real Promptetheus SDK events. The engine can't tell a
-scripted agent from a live one — all it ever sees is the trace.
+A member opens a chat and Robin walks them through their request — looking up the
+order, confirming the reason, and processing the refund — over a short branching
+conversation. Each turn (member message, agent reply, retrieval, tool call, goal
+check) is emitted to Promptetheus as a typed event, giving full visibility into
+what the agent retrieved versus what it actually told the member.
 
-## How it fits the demo
+## Observability
 
 ```
-[chat agent runs] --(Promptetheus SDK)--> trace of events --(HTTP)--> Promptetheus engine --> incident
+[Robin handles a chat] --(Promptetheus SDK)--> session trace --(HTTP)--> Promptetheus engine --> incidents
 ```
 
-There are no separate "fake logs": the agent running **is** the logging. As the
-scripted conversation plays, the SDK emits the typed events. The browser and
-voice agents do the same with their own traces.
+The agent emits its trace inline as it runs — there's no separate logging step.
+When a session's final `goal_check` fails (e.g. the agent retrieved one fact but
+acted on another), Promptetheus raises an incident with the contradicting events
+as evidence.
+
+Example session the engine flagged: Robin retrieved order #4471 (total **$20**,
+refundable $20) but issued a **$200** refund — a 10× overpayment — and closed the
+chat as resolved. The `retrieval` vs `tool_call`/`agent_message` contradiction is
+the evidence; the failed `goal_check` is the trigger.
 
 ## Run the web UI
 
 ```bash
 pip install -r requirements.txt
 python -m uvicorn server:app --reload --port 8000
-# open http://127.0.0.1:8000  →  click "Start refund chat"
+# open http://127.0.0.1:8000
 ```
 
-The Promptetheus SDK is **optional** for this local demo — if it isn't installed,
-the agent falls back to a local in-memory recorder (`promptetheus_compat.py`) and
-the UI badge shows "local fallback". Install the SDK and point the server at a
-live API to post real traces:
+Configure the Promptetheus endpoint to stream traces to your project:
 
 ```bash
 pip install "git+https://github.com/obro79/promptetheus-hackathon.git@main#subdirectory=packages/promptetheus"
@@ -43,23 +47,25 @@ PROMPTETHEUS_ENDPOINT=http://127.0.0.1:4318 PROMPTETHEUS_API_KEY=pt_dev_key \
   python -m uvicorn server:app --port 8000
 ```
 
-## Run headless (just the trace)
+If the SDK isn't configured, events are captured in-process (via
+`promptetheus_compat.py`) so the agent keeps running without a collector.
+
+## Run headless
 
 ```bash
-python chat_agent.py                                  # prints transcript + event sequence
-python chat_agent.py --endpoint <URL> --api-key <KEY> # posts the trace (needs the real SDK)
+python chat_agent.py                                  # prints the session + event sequence
+python chat_agent.py --endpoint <URL> --api-key <KEY> # streams the trace to Promptetheus
 ```
 
-Expected event sequence:
-`user_message → agent_message → retrieval → tool_call → tool_result → agent_message → goal_check(passed=False) → session_end`
+Session event sequence:
+`user_message → agent_message → retrieval → tool_call → tool_result → agent_message → goal_check → session_end`
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `chat_agent.py` | The scripted agent: the conversation + the trace it emits. CLI runnable. |
-| `server.py` | FastAPI web UI; `/api/run` plays the conversation and emits the trace. |
-| `static/index.html` | The chat page. |
-| `promptetheus_compat.py` | Uses the real SDK if installed, else a local fallback recorder. |
-
-See `CLAUDE.md` for the full build brief and SDK contract.
+| `dialogue.py` | Conversation flow + quick replies. |
+| `chat_agent.py` | Refund handling and Promptetheus trace emission. CLI runnable. |
+| `server.py` | FastAPI app serving the chat UI and conversation API. |
+| `static/index.html` | The chat interface (chips + text input). |
+| `promptetheus_compat.py` | Promptetheus SDK integration with in-process capture when no collector is set. |
