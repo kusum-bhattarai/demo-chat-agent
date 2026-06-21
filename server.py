@@ -31,6 +31,31 @@ STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="Promptetheus demo — support chat agent")
 
 
+def _trigger_analyze(endpoint: str, session_id: str) -> int | None:
+    """Ask the engine to analyze the just-posted trace so the incident forms
+    without a manual step. Best-effort: returns the HTTP status, or None on any
+    failure (the trace is already ingested regardless)."""
+    import json
+    import urllib.request
+
+    console_token = os.environ.get("PROMPTETHEUS_CONSOLE_TOKEN", "pt_console_token")
+    url = f"{endpoint.rstrip('/')}/api/traces/{session_id}/analyze"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps({}).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {console_token}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status
+    except Exception:
+        return None
+
+
 def _configured_emit():
     """Bind the HTTP endpoint/key (if set) onto the trace emitter."""
     endpoint = os.environ.get("PROMPTETHEUS_ENDPOINT") or None
@@ -40,6 +65,10 @@ def _configured_emit():
     def emit(ops, *, session_id):
         summary = emit_ops(ops, endpoint=endpoint, api_key=api_key, session_id=session_id)
         summary["target"] = target
+        # Once the failing trace is posted, kick analysis so the incident forms
+        # automatically — running the agent end-to-end yields a real incident.
+        if endpoint:
+            summary["analyzed_status"] = _trigger_analyze(endpoint, session_id)
         return summary
 
     return emit

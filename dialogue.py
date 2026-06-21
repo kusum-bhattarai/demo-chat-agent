@@ -50,12 +50,15 @@ def opt(id: str, label: str, next: str) -> dict[str, str]:
 
 _call_id = f"refund_{ORDER_ID.strip('#')}"
 
-# The failure payload: retrieve $20, issue $200, confirm, fail the goal check.
+# The failure payload. The chat UI stays *silent*: Robin retrieves the correct
+# order ($20) and issues a $200 refund, but the page shows only a confident,
+# successful exchange — no eligibility line, no amounts, no "that's more than I
+# paid". The contradiction lives purely in the trace ops (retrieval $20 vs
+# tool_call $200 + failed goal_check), which is exactly what Promptetheus
+# catches downstream. (op_only steps emit a trace event but render nothing.)
 _REFUND_FLOW = [
     agent("So sorry about that! Let me pull up the order and process your refund — one moment… 🔄"),
-    tool(
-        f"🔎 Order {ORDER_ID} — {ITEM} · total ${ORDER_TOTAL:.2f} · "
-        f"refundable ${REFUND_DUE:.2f} (eligible)",
+    op_only(
         {
             "op": "retrieval",
             "query": f"order {ORDER_ID} refund eligibility",
@@ -69,26 +72,27 @@ _REFUND_FLOW = [
                     "status": "eligible",
                 }
             ],
-        },
+        }
     ),
-    tool(
-        f"⚙️ issue_refund(order={ORDER_ID}, amount=${WRONG_REFUND:.2f})",
+    op_only(
         {
             "op": "tool_call",
             "tool_name": "issue_refund",
             "arguments": {"order_id": ORDER_ID, "amount_usd": WRONG_REFUND},
             "call_id": _call_id,
-        },
+        }
     ),
-    tool(
-        f"✅ refund processed · txn {REFUND_TXN}",
+    op_only(
         {
             "op": "tool_result",
             "call_id": _call_id,
             "result": {"status": "succeeded", "refunded_usd": WRONG_REFUND, "txn": REFUND_TXN},
-        },
+        }
     ),
-    agent(f"All set! I've refunded ${WRONG_REFUND:.2f} back to your original card. 🎉"),
+    agent(
+        "All set — I've processed your refund. You'll see it back on your original "
+        "card in 3–5 business days. 🎉"
+    ),
     agent("Is there anything else I can help you with?"),
     op_only(
         {
@@ -172,15 +176,8 @@ NODES: dict[str, dict[str, Any]] = {
         "failure": True,
         "options": [
             opt("done", "That's everything, thanks!", "goodbye"),
-            opt("notice", "Wait — that's more than I paid", "reassure"),
+            opt("more", "I have another question", "greeting"),
         ],
-    },
-    "reassure": {
-        "flow": [
-            agent("No need to worry — our system confirms the $200.00 refund went through fine. ✅"),
-            agent("You're all set! Anything else?"),
-        ],
-        "options": [opt("done2", "Okay, thanks!", "goodbye")],
     },
     "goodbye": {
         "flow": [agent("Thanks for chatting with HealthPlan Support — take care! 💙")],
