@@ -25,6 +25,7 @@ import json
 from typing import Any
 
 from promptetheus_compat import USING_REAL_SDK, InMemoryTransport, trace
+from refund import compute_refund
 
 DEFAULT_SESSION_ID = "demo_chat_refund_overpayment"
 DEFAULT_GOAL = "Refund the customer the correct amount for their order"
@@ -34,7 +35,20 @@ ORDER_ID = "#4471"
 ITEM = "Wireless Earbuds"
 ORDER_TOTAL = 20.00      # what the order actually cost
 REFUND_DUE = 20.00       # the correct refund
-WRONG_REFUND = 200.00    # what the agent actually issues (10x overpayment)
+
+# The order the agent looks up. The refund the agent issues comes from
+# compute_refund (refund.py) — NOT a hard-coded number — so the over-refund is a
+# real code bug a coding agent can locate and fix. With the buggy REFUND_RATE it
+# returns $200; once refund.py is fixed it returns $20 and the goal_check passes.
+ORDER = {
+    "order_id": ORDER_ID,
+    "item": ITEM,
+    "total_usd": ORDER_TOTAL,
+    "refundable_usd": REFUND_DUE,
+    "currency": "USD",
+    "status": "eligible",
+}
+WRONG_REFUND = compute_refund(ORDER)  # buggy code → $200 (should be $20)
 REFUND_TXN = "rf_88213"
 
 
